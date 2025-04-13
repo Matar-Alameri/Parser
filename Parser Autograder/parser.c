@@ -26,6 +26,8 @@ ParserInfo memberDeclar();
 ParserInfo classVarDeclar();
 ParserInfo SubroutineDeclar();
 ParserInfo paramList();
+ParserInfo subroutineCall();
+ParserInfo subroutineBody();
 Token t;
 
 const char* subroutine_declars[] = {"constructor", "method", "function"};
@@ -40,8 +42,8 @@ int types_num = 3;
 const char* statments_list[] = {"var", "let", "if", "while", "do", "return"};
 int statements_num = 6;
 
-const char* operand_list[] = {"null", "this", "true", "false"};
-int operand_num = 4;
+const char* operand_list[] = {"null", "this", "true", "false","("};
+int operand_num = 5;
 
 int IsSubroutine(char* str)
 {
@@ -299,9 +301,9 @@ ParserInfo classVarDeclar()
 		}
 	}
 	t = PeekNextToken();
-	while (!strcmp(t.lx, ","))
+	while (!strcmp(t.lx, ",")) // if the next token is "," enter in a loop
 	{
-		GetNextToken();
+		GetNextToken(); //consume ","
 		t = GetNextToken();
 		if (t.tp == ID)
 		{
@@ -316,7 +318,7 @@ ParserInfo classVarDeclar()
 				return pi;
 			}
 		}
-		t = PeekNextToken();
+		t = PeekNextToken(); //check the next token without consuming if it was a "," then the loop continues
 	}
 	t = GetNextToken();
 	if (!strcmp(t.lx, ";"))
@@ -423,10 +425,10 @@ ParserInfo SubroutineDeclar()
 			return pi;
 		}
 	}
-	t = GetNextToken();
+	t = PeekNextToken();
 	if (!strcmp(t.lx,"{"))
 	{
-		;
+		pi = subroutineBody();
 	}
 	else
 	{
@@ -437,27 +439,8 @@ ParserInfo SubroutineDeclar()
 			return pi;
 		}
 	}
-	t = PeekNextToken();
-	while (IsStatement(t.lx))
-	{
-		pi = statement();
-		t = pi.tk;
-		t = PeekNextToken();
-	}
-	t = GetNextToken();
-	if (!strcmp(t.lx,"}"))
-	{
-		;
-	}
-	else
-	{
-		if (pi.er == none)
-		{
-			pi.er = closeBraceExpected;
-			pi.tk = t;
-			return pi;
-		}
-	}
+	
+	
 	pi.tk = t;
 	return pi;
 }
@@ -536,6 +519,38 @@ ParserInfo paramList()
 	pi.tk = t;
 	return pi;
 }
+ParserInfo subroutineBody()
+{
+	ParserInfo pi;
+    pi.er = none;
+    pi.tk = t;
+	t = GetNextToken();
+
+
+	t = PeekNextToken();
+	while (IsStatement(t.lx))
+	{
+		pi = statement();
+		t = pi.tk;
+		t = PeekNextToken();
+	}
+	t = GetNextToken();
+	if (!strcmp(t.lx,"}"))
+	{
+		;
+	}
+	else
+	{
+		if (pi.er == none)
+		{
+			pi.er = closeBraceExpected;
+			pi.tk = t;
+			return pi;
+		}
+	}
+	pi.tk = t;	
+	return pi;
+}
 
 ParserInfo statement()
 {
@@ -546,32 +561,32 @@ ParserInfo statement()
 	if (!strcmp(t.lx,"var"))
 	{
 		pi = varDeclarStatement();
-		t = pi.tk;
+		if (pi.er != none) return pi;
 	}
 	else if (!strcmp(t.lx,"let"))
 	{
 		pi = letStatement();
-		t = pi.tk;
+		if (pi.er != none) return pi;
 	}
 	else if (!strcmp(t.lx,"if"))
 	{
 		pi = ifStatement();
-		t = pi.tk;
+		if (pi.er != none) return pi;
 	}
 	else if (!strcmp(t.lx,"while"))
 	{
 		pi = whileStatement();
-		t = pi.tk;
+		if (pi.er != none) return pi;
 	}
 	else if (!strcmp(t.lx,"do"))
 	{
 		pi = doStatement();
-		t = pi.tk;
+		if (pi.er != none) return pi;
 	}
 	else if (!strcmp(t.lx,"return"))
 	{
 		pi = returnStatement();
-		t = pi.tk;
+		if (pi.er != none) return pi;
 	}
 	else
 	{
@@ -582,6 +597,7 @@ ParserInfo statement()
 			return pi;
 		}
 	}
+	pi.tk = t;
 	return pi;
 }
 
@@ -710,6 +726,7 @@ ParserInfo letStatement()
 		if (IsFactor(t))
 		{	
 			pi = expression();
+			if (pi.er != none) return pi;
 			t = pi.tk;
 		}
 		else 
@@ -755,6 +772,7 @@ ParserInfo letStatement()
 	if (IsFactor(t))
 		{	
 			pi = expression();
+			if (pi.er != none) return pi;
 			t = pi.tk;
 		}
 		else 
@@ -798,6 +816,7 @@ ParserInfo ifStatement()
 		if (pi.er == none)
 		{
 			pi.er = syntaxError;
+			pi.tk = t;
 			return pi;
 		}
 	}
@@ -826,6 +845,7 @@ ParserInfo ifStatement()
 		if (pi.er == none)
 		{
 			pi.er = syntaxError;
+			pi.tk = t;
 			return pi;
 		}
 	}
@@ -839,6 +859,7 @@ ParserInfo ifStatement()
 		if (pi.er == none)
 		{
 			pi.er = closeParenExpected;
+			pi.tk = t;
 			return pi;
 		}
 	}
@@ -852,6 +873,7 @@ ParserInfo ifStatement()
 		if (pi.er == none)
 		{
 			pi.er = openBraceExpected;
+			pi.tk = t;
 			return pi;
 		}
 	}
@@ -1040,6 +1062,43 @@ ParserInfo doStatement()
 			return pi;
 		}
 	}
+	t = PeekNextToken();
+	if (t.tp == ID)
+	{
+		pi = subroutineCall();
+	}
+	else
+	{
+		if (pi.er == none)
+		{
+			pi.er = idExpected;
+			pi.tk = t;
+			return pi;
+		}
+	}
+	
+	t = GetNextToken();
+	if (!strcmp(t.lx,";"))
+	{
+		;
+	}
+	else
+	{
+		if (pi.er == none)
+		{
+			pi.er = semicolonExpected;
+			pi.tk = t;
+			return pi;
+		}
+	}
+	pi.tk = t;
+	return pi;
+}
+ParserInfo subroutineCall()
+{
+	ParserInfo pi;
+	pi.er = none;
+	pi.tk = t;
 	t = GetNextToken();
 	if (t.tp == ID)
 	{
@@ -1109,20 +1168,6 @@ ParserInfo doStatement()
 			return pi;
 		}
 	}
-	t = GetNextToken();
-	if (!strcmp(t.lx,";"))
-	{
-		;
-	}
-	else
-	{
-		if (pi.er == none)
-		{
-			pi.er = semicolonExpected;
-			pi.tk = t;
-			return pi;
-		}
-	}
 	pi.tk = t;
 	return pi;
 }
@@ -1135,12 +1180,14 @@ ParserInfo expressionList()
 	if (IsFactor(t))
 	{
 		pi = expression();
+		if (pi.er != none) return pi;
 		t = pi.tk;
 		t = PeekNextToken();
 		while (!strcmp(t.lx,","))
 		{
 			GetNextToken();
 			pi = expression();
+			if (pi.er != none) return pi;
 			t = pi.tk;
 			t = PeekNextToken();
 		}
@@ -1414,6 +1461,9 @@ ParserInfo operand()
 	ParserInfo pi;
 	pi.er = none;
 	pi.tk = t;
+	printf("you started operand\n");
+	printf("Token details: type=%d, lexeme=%s, errorCode=%d, line=%d, file=%s\n",
+		pi.tk.tp, pi.tk.lx, pi.tk.ec, pi.tk.ln, pi.tk.fl); 
 	t = GetNextToken();
 	if (!strcmp(t.lx,"true"))
 	{
@@ -1446,28 +1496,21 @@ ParserInfo operand()
 		{
 			pi = expression();
 			t = pi.tk;
-		}
-		else
-		{
-			if (pi.er == none)
-				{
-					pi.er = syntaxError;
-					pi.tk = t;
-					return pi;
-				}
+			if (pi.er != none) return pi;
+			
 		}
 		t = GetNextToken();
 		if (!strcmp(t.lx,")"))
 		{
 			;
 		}
-		else 
+		else
 		{
 			if (pi.er == none)
 			{
-				pi.er = closeParenExpected;
-				pi.tk = t;
-				return pi;
+			pi.er = closeParenExpected;
+			pi.tk = t;
+			return pi;
 			}
 		}
 	}
@@ -1476,8 +1519,9 @@ ParserInfo operand()
 		t = PeekNextToken();
 		if (!strcmp(t.lx,"."))
 		{
-			GetNextToken();
-			t = GetNextToken();
+			GetNextToken(); //consume the "."
+
+			t = GetNextToken(); //consume the next token and assign it to t
 			if (t.tp == ID)
 			{
 				;
@@ -1486,21 +1530,23 @@ ParserInfo operand()
 			{
 				if (pi.er == none)
 				{
-					pi.er = idExpected;
+					pi.er = syntaxError;
 					pi.tk = t;
 					return pi;
 				}
 			}
 			t = PeekNextToken();
 		}
-		if (!strcmp(t.lx,"[" ))
+		if (!strcmp(t.lx,"["))
 		{
-			GetNextToken();
+			GetNextToken(); //consume "["
 			t = PeekNextToken();
 			if (IsFactor(t))
 			{
 				pi = expression();
 				t = pi.tk;
+				if (pi.er != none) return pi;
+
 			}
 			else
 			{
@@ -1525,27 +1571,21 @@ ParserInfo operand()
 					return pi;
 				}
 			}
+			
 		}
-		else if (!strcmp(t.lx,"(" ))
+		else if (!strcmp(t.lx,"("))
 		{
-			GetNextToken();
+			GetNextToken(); // consume "("
 			t = PeekNextToken();
 			if (IsFactor(t))
 			{
 				pi = expressionList();
 				t = pi.tk;
-			}
-			else
-			{
-				if (pi.er == none)
-				{
-					pi.er = syntaxError;
-					pi.tk = t;
-					return pi;
-				}
+				if (pi.er != none) return pi;
+
 			}
 			t = GetNextToken();
-			if (!strcmp(t.lx,")"))
+			if (!strcmp(t.lx, ")"))
 			{
 				;
 			}
@@ -1559,18 +1599,13 @@ ParserInfo operand()
 				}
 			}
 		}
-		
+
 	}
-	else 
-	{
-		if (pi.er == none)
-				{
-					pi.er = syntaxError;
-					pi.tk = t;
-					return pi;
-				}
-	}
+	
 	pi.tk = t;
+	printf("ended operand\n");
+	printf("Token details: type=%d, lexeme=%s, errorCode=%d, line=%d, file=%s\n",
+		pi.tk.tp, pi.tk.lx, pi.tk.ec, pi.tk.ln, pi.tk.fl); 
 	return pi;
 }
 

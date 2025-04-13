@@ -15,6 +15,7 @@ FILE* f;
 int TokenReady; 
 Token t;
 int LineCount;
+char Filename[32]; 
 
 int InitLexer(char* file_name) // init the lexer
 {
@@ -23,6 +24,9 @@ int InitLexer(char* file_name) // init the lexer
 	f = fopen(file_name, "r");
 	if (f == 0)
 		return 0;
+	// Copy the filename into a global variable for later use:
+    strncpy(Filename, file_name, sizeof(Filename) - 1);
+    Filename[sizeof(Filename) - 1] = '\0'; // Ensure it is terminated.
 	TokenReady = 0;
 	LineCount = 1;
 	return 1;
@@ -109,6 +113,7 @@ Token BuildToken()
 	if (c == -11)
 	{
 		strcpy(t.lx, "Error: unexpected eof in comment");
+		strcpy(t.fl, Filename);
 		t.tp = ERR;
 		t.ec = EofInCom;
 		t.ln = LineCount;
@@ -118,6 +123,7 @@ Token BuildToken()
 	{
 		t.tp = EOFile;
 		t.ln = LineCount;
+		strcpy(t.fl, Filename);
 		return t;
 	}
 	else if (c != EOF && (isalpha(c) || c == '_'))
@@ -136,6 +142,7 @@ Token BuildToken()
 			else
 				t.tp = ID;
 			t.ln = LineCount;
+			strcpy(t.fl, Filename);
 			return t;
 		}
 	else if (c != EOF && isdigit(c))
@@ -148,6 +155,7 @@ Token BuildToken()
 			temp[i] = '\0';
 			ungetc(c, f);
 			strcpy(t.lx, temp);
+			strcpy(t.fl, Filename);
 			t.tp = INT;
 			t.ln = LineCount;
 			return t;
@@ -162,6 +170,7 @@ Token BuildToken()
 				if(c == '\n')
 				{
 					strcpy(t.lx, "Error: new line in string constant");
+					strcpy(t.fl, Filename);
 					t.ln = LineCount;
 					t.tp = ERR;
 					t.ec = NewLnInStr;
@@ -170,6 +179,7 @@ Token BuildToken()
 				else if(c == EOF)
 				{
 					strcpy(t.lx, "Error: unexpected eof in string constant");
+					strcpy(t.fl, Filename);
 					t.ln = LineCount;
 					t.tp = ERR;
 					t.ec = EofInStr;
@@ -180,6 +190,7 @@ Token BuildToken()
 			}
 			temp[i] = '\0';
 			strcpy(t.lx, temp);
+			strcpy(t.fl, Filename);
 			t.tp = STRING;
 			t.ln = LineCount;
 			return t;
@@ -196,6 +207,7 @@ Token BuildToken()
 				strcpy(t.lx, "Error: illegal symbol in source file");
 			
 			t.ln = LineCount;
+			strcpy(t.fl, Filename);
 			return t;
 		
 	}//return t;
